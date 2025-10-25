@@ -1,0 +1,55 @@
+Use this tool when you need to ask the user questions during execution. This allows you to:
+1. Gather user preferences or requirements
+2. Clarify ambiguous instructions
+3. Get decisions on implementation choices as you work
+4. Offer choices to the user about what direction to take
+
+Usage notes:
+- Users will always be able to select "Other" to provide custom text input (automatically added)
+- Use multiSelect: true to allow multiple answers to be selected for a question
+- Provide 2-4 clear, distinct options for each question
+- Keep headers short (max 12 characters) for display purposes
+- Write clear descriptions for each option to help users make informed choices
+
+## When to Use This Tool
+
+Use this tool proactively when:
+1. There are multiple valid approaches to solve a problem
+2. You need clarification on user preferences (e.g., library choices, architectural patterns)
+3. The requirements are ambiguous or unclear
+4. You want to offer the user choices about implementation details
+
+## Examples
+
+Example 1: Clarifying authentication method
+```
+Question: "Which authentication method should we use?"
+Header: "Auth method"
+Options:
+  - JWT: "Use JSON Web Tokens for stateless authentication"
+  - OAuth: "Use OAuth 2.0 for third-party authentication"
+  - Session: "Use traditional session-based authentication"
+```
+
+Example 2: Library selection
+```
+Question: "Which date library should we use for date formatting?"
+Header: "Date lib"
+Options:
+  - date-fns: "Lightweight, modular, tree-shakeable"
+  - dayjs: "2KB alternative to Moment.js with same API"
+  - Luxon: "Powerful library with timezone support"
+```
+
+Example 3: Multiple selections
+```
+Question: "Which features do you want to enable?"
+Header: "Features"
+MultiSelect: true
+Options:
+  - Analytics: "Track user behavior and metrics"
+  - Notifications: "Push notifications for users"
+  - DarkMode: "Support for dark mode theme"
+```
+
+The answers will be returned as a key-value mapping where keys are the question headers and values are the selected option labels.

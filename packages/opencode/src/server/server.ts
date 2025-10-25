@@ -37,6 +37,7 @@ import { SessionCompaction } from "../session/compaction"
 import { SessionRevert } from "../session/revert"
 import { lazy } from "../util/lazy"
 import { Todo } from "../session/todo"
+import { Question } from "../session/question"
 import { InstanceBootstrap } from "../project/bootstrap"
 import { MCP } from "../mcp"
 import { Storage } from "../storage/storage"
@@ -993,6 +994,142 @@ export namespace Server {
             sessionID: id,
             permissionID,
             response: c.req.valid("json").response,
+          })
+          return c.json(true)
+        },
+      )
+      .get(
+        "/session/:id/questions",
+        describeRoute({
+          description: "List all questions for a session",
+          operationId: "question.list",
+          responses: {
+            200: {
+              description: "List of questions",
+              content: {
+                "application/json": {
+                  schema: resolver(z.array(Question.Info)),
+                },
+              },
+            },
+            ...errors(400, 404),
+          },
+        }),
+        validator(
+          "param",
+          z.object({
+            id: z.string(),
+          }),
+        ),
+        async (c) => {
+          const params = c.req.valid("param")
+          const questions = await Question.list(params.id)
+          return c.json(questions)
+        },
+      )
+      .get(
+        "/session/:id/questions/:questionID",
+        describeRoute({
+          description: "Get a specific question",
+          operationId: "question.get",
+          responses: {
+            200: {
+              description: "Question details",
+              content: {
+                "application/json": {
+                  schema: resolver(Question.Info),
+                },
+              },
+            },
+            ...errors(400, 404),
+          },
+        }),
+        validator(
+          "param",
+          z.object({
+            id: z.string(),
+            questionID: z.string(),
+          }),
+        ),
+        async (c) => {
+          const params = c.req.valid("param")
+          const question = await Question.get(params.id, params.questionID)
+          if (!question) {
+            return c.json({ error: "Question not found" }, 404)
+          }
+          return c.json(question)
+        },
+      )
+      .post(
+        "/session/:id/questions/:questionID/answer",
+        describeRoute({
+          description: "Answer a question",
+          operationId: "question.answer",
+          responses: {
+            200: {
+              description: "Answer processed successfully",
+              content: {
+                "application/json": {
+                  schema: resolver(z.boolean()),
+                },
+              },
+            },
+            ...errors(400, 404),
+          },
+        }),
+        validator(
+          "param",
+          z.object({
+            id: z.string(),
+            questionID: z.string(),
+          }),
+        ),
+        validator(
+          "json",
+          z.object({
+            answers: z.record(z.string(), z.string()),
+          }),
+        ),
+        async (c) => {
+          const params = c.req.valid("param")
+          const body = c.req.valid("json")
+          await Question.answer({
+            sessionID: params.id,
+            questionID: params.questionID,
+            answers: body.answers,
+          })
+          return c.json(true)
+        },
+      )
+      .post(
+        "/session/:id/questions/:questionID/cancel",
+        describeRoute({
+          description: "Cancel a question",
+          operationId: "question.cancel",
+          responses: {
+            200: {
+              description: "Question cancelled successfully",
+              content: {
+                "application/json": {
+                  schema: resolver(z.boolean()),
+                },
+              },
+            },
+            ...errors(400, 404),
+          },
+        }),
+        validator(
+          "param",
+          z.object({
+            id: z.string(),
+            questionID: z.string(),
+          }),
+        ),
+        async (c) => {
+          const params = c.req.valid("param")
+          await Question.cancel({
+            sessionID: params.id,
+            questionID: params.questionID,
           })
           return c.json(true)
         },
