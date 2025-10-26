@@ -94,6 +94,7 @@ export namespace SessionPrompt {
       })
       .optional(),
     agent: z.string().optional(),
+    noReply: z.boolean().optional(),
     system: z.string().optional(),
     tools: z.record(z.string(), z.boolean()).optional(),
     parts: z.array(
@@ -141,6 +142,11 @@ export namespace SessionPrompt {
 
     const userMsg = await createUserMessage(input)
     await Session.touch(input.sessionID)
+
+    // Early return for context-only messages (no AI inference)
+    if (input.noReply) {
+      return userMsg
+    }
 
     if (isBusy(input.sessionID)) {
       return new Promise((resolve) => {
@@ -1753,9 +1759,15 @@ export namespace SessionPrompt {
       .then((result) => {
         if (result.text)
           return Session.update(input.session.id, (draft) => {
-            const cleaned = result.text.replace(/<think>[\s\S]*?<\/think>\s*/g, "").split("\n")[0]
+            const cleaned = result.text
+              .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
+              .split("\n")
+              .map((line) => line.trim())
+              .find((line) => line.length > 0)
+            if (!cleaned) return
+
             const title = cleaned.length > 100 ? cleaned.substring(0, 97) + "..." : cleaned
-            draft.title = title.trim()
+            draft.title = title
           })
       })
       .catch((error) => {
