@@ -156,14 +156,26 @@ export const TuiCommand = cmd({
         })
 
         ;(async () => {
-          // if (Installation.isLocal()) return
+          if (Installation.isLocal()) return
           const config = await Config.get()
           if (config.autoupdate === false || Flag.OPENCODE_DISABLE_AUTOUPDATE) return
           const latest = await Installation.latest().catch(() => {})
           if (!latest) return
           if (Installation.VERSION === latest) return
+
+          // Don't auto-update preview/dev builds to stable releases
+          // User can manually upgrade if they want
+          if (Installation.isPreview()) {
+            Log.info("Skipping auto-update for preview build", {
+              current: Installation.VERSION,
+              latest,
+            })
+            return
+          }
+
           const method = await Installation.method()
-          if (method === "unknown") return
+          // Skip package manager check if using GitHub releases
+          if (!Installation.GITHUB_REPO && method === "unknown") return
           await Installation.upgrade(method, latest)
             .then(() => Bus.publish(Installation.Event.Updated, { version: latest }))
             .catch(() => {})

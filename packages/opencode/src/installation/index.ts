@@ -103,50 +103,71 @@ export namespace Installation {
   )
 
   export async function upgrade(method: Method, target: string) {
-    const cmd = (() => {
-      switch (method) {
-        case "curl":
-          return $`curl -fsSL https://opencode.ai/install | bash`.env({
-            ...process.env,
-            VERSION: target,
-          })
-        case "npm":
-          return $`npm install -g opencode-ai@${target}`
-        case "pnpm":
-          return $`pnpm install -g opencode-ai@${target}`
-        case "bun":
-          return $`bun install -g opencode-ai@${target}`
-        case "brew":
-          return $`brew install sst/tap/opencode`.env({
-            HOMEBREW_NO_AUTO_UPDATE: "1",
-          })
-        default:
-          throw new Error(`Unknown method: ${method}`)
-      }
-    })()
-    const result = await cmd.quiet().throws(false)
-    log.info("upgraded", {
-      method,
-      target,
-      stdout: result.stdout.toString(),
-      stderr: result.stderr.toString(),
-    })
-    if (result.exitCode !== 0)
+    const platform = process.platform === "win32" ? "windows" : process.platform
+    const arch = process.arch
+    const binaryName = `opencode-${platform}-${arch}`
+    const downloadUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${target}/${binaryName}.tar.gz`
+
+    log.info("downloading from GitHub", { url: downloadUrl })
+
+    const tmpDir = `/tmp/opencode-upgrade-${Date.now()}`
+    const binaryPath = process.execPath
+    const binaryDir = path.dirname(binaryPath)
+    const tempBinaryPath = path.join(binaryDir, `.opencode.${Date.now()}.tmp`)
+
+    // Download and extract to temp directory
+    await $`mkdir -p ${tmpDir}`.quiet()
+    const downloadResult = await $`curl -fsSL ${downloadUrl} | tar -xz -C ${tmpDir}`.quiet().throws(false)
+
+    if (downloadResult.exitCode !== 0) {
+      await $`rm -rf ${tmpDir}`.quiet()
       throw new UpgradeFailedError({
-        stderr: result.stderr.toString("utf8"),
+        stderr: downloadResult.stderr.toString("utf8"),
+      })
+    }
+
+    // Copy to temp file in same directory, then atomically rename
+    const newBinary = path.join(tmpDir, binaryName, "bin", "opencode")
+    const copyResult = await $`cp ${newBinary} ${tempBinaryPath} && chmod +x ${tempBinaryPath}`.quiet().throws(false)
+
+    if (copyResult.exitCode !== 0) {
+      await $`rm -rf ${tmpDir}`.quiet()
+      await $`rm -f ${tempBinaryPath}`.quiet()
+      throw new UpgradeFailedError({
+        stderr: copyResult.stderr.toString("utf8"),
+      })
+    }
+
+    // Atomic rename (works even if binary is running)
+    const renameResult = await $`mv ${tempBinaryPath} ${binaryPath}`.quiet().throws(false)
+
+    // Cleanup
+    await $`rm -rf ${tmpDir}`.quiet()
+    await $`rm -f ${tempBinaryPath}`.quiet()
+
+    log.info("upgraded from GitHub", {
+      method: "github",
+      target,
+      binaryPath,
+    })
+
+    if (renameResult.exitCode !== 0)
+      throw new UpgradeFailedError({
+        stderr: renameResult.stderr.toString("utf8"),
       })
   }
 
   export const VERSION = typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "local"
   export const CHANNEL = typeof OPENCODE_CHANNEL === "string" ? OPENCODE_CHANNEL : "local"
   export const USER_AGENT = `opencode/${CHANNEL}/${VERSION}`
+  export const GITHUB_REPO = process.env.OPENCODE_GITHUB_REPO || "zgltyq/opencode"
 
   export async function latest() {
-    return fetch(`https://registry.npmjs.org/opencode-ai/${CHANNEL}`)
+    return fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`)
       .then((res) => {
         if (!res.ok) throw new Error(res.statusText)
         return res.json()
       })
-      .then((data: any) => data.version)
+      .then((data: any) => data.tag_name.replace(/^v/, ""))
   }
 }
