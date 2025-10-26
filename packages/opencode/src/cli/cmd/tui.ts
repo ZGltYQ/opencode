@@ -166,7 +166,7 @@ export const TuiCommand = cmd({
           // Don't auto-update preview/dev builds to stable releases
           // User can manually upgrade if they want
           if (Installation.isPreview()) {
-            Log.info("Skipping auto-update for preview build", {
+            Log.Default.info("Skipping auto-update for preview build", {
               current: Installation.VERSION,
               latest,
             })
